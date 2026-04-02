@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Student or Owner profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "paid": { "type": "boolean" },
+        "accessUntil": { "type": "string", "format": "date-time" },
+        "roll": { "type": "string" },
+        "downloads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "chapterId": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Study notes for a chapter",
+      "type": "object",
+      "properties": {
+        "chapterId": { "type": "string" },
+        "content": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chapterId", "content"]
+    },
+    "Formula": {
+      "title": "Formula",
+      "description": "Mathematical or accounting formula",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "title": { "type": "string" },
+        "formula": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["subject", "title", "formula"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "YouTube video link for a chapter",
+      "type": "object",
+      "properties": {
+        "chapterId": { "type": "string" },
+        "youtubeId": { "type": "string" }
+      },
+      "required": ["chapterId", "youtubeId"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat message in the student group",
+      "type": "object",
+      "properties": {
+        "from": { "type": "string" },
+        "email": { "type": "string" },
+        "text": { "type": "string" },
+        "at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["from", "email", "text", "at"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment transaction for approval",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "txnId": { "type": "string" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["email", "name", "txnId", "submittedAt", "status"]
+    },
+    "AppConfig": {
+      "title": "AppConfig",
+      "description": "Global application settings",
+      "type": "object",
+      "properties": {
+        "price": { "type": "number" },
+        "days": { "type": "number" },
+        "currency": { "type": "string" },
+        "upiId": { "type": "string" },
+        "upiName": { "type": "string" },
+        "announcement": { "type": "string" }
+      }
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Subject structure with chapters",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "chapters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles" },
+    "/notes/{chapterId}": { "schema": "Note", "description": "Chapter notes" },
+    "/formulas/{formulaId}": { "schema": "Formula", "description": "Shared formulas" },
+    "/videos/{chapterId}": { "schema": "Video", "description": "Chapter videos" },
+    "/messages/{messageId}": { "schema": "Message", "description": "Group chat messages" },
+    "/payments/{paymentId}": { "schema": "Payment", "description": "Payment submissions" },
+    "/config/global": { "schema": "AppConfig", "description": "Global app settings" },
+    "/chapters/{subjectId}": { "schema": "Subject", "description": "Subject and chapter structure" }
+  }
+}

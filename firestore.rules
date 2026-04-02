@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: uid
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required, size < 50)
+    //   - email: string (required, format email)
+    //   - role: string (required, enum: ['student', 'admin'])
+    //   - paid: boolean (optional)
+    //   - accessUntil: string (optional, format date-time)
+    //   - roll: string (optional)
+    //   - downloads: list (optional, list of maps with chapterId and timestamp)
+    //
+    // Collection: notes
+    // Document ID: chapterId
+    // Fields:
+    //   - chapterId: string (required)
+    //   - content: string (required, size < 50000)
+    //   - updatedAt: string (required, format date-time)
+    //
+    // Collection: formulas
+    // Document ID: formulaId
+    // Fields:
+    //   - subject: string (required)
+    //   - title: string (required, size < 100)
+    //   - formula: string (required, size < 1000)
+    //   - createdAt: string (required, format date-time)
+    //
+    // Collection: videos
+    // Document ID: chapterId
+    // Fields:
+    //   - chapterId: string (required)
+    //   - youtubeId: string (required)
+    //
+    // Collection: messages
+    // Document ID: messageId
+    // Fields:
+    //   - from: string (required)
+    //   - email: string (required)
+    //   - text: string (required, size < 500)
+    //   - at: string (required, format date-time)
+    //
+    // Collection: payments
+    // Document ID: paymentId
+    // Fields:
+    //   - email: string (required)
+    //   - name: string (required)
+    //   - txnId: string (required, size < 50)
+    //   - submittedAt: string (required, format date-time)
+    //   - status: string (required, enum: ['pending', 'approved', 'rejected'])
+    //
+    // Collection: config
+    // Document ID: global
+    // Fields:
+    //   - price: number
+    //   - days: number
+    //   - currency: string
+    //   - upiId: string
+    //   - upiName: string
+    //   - announcement: string
+    //
+    // ===============================================================
+
+    // Collection: support_messages
+    // Document ID: messageId
+    // Fields:
+    //   - chatId: string (required, student uid)
+    //   - from: string (required)
+    //   - email: string (required)
+    //   - fromUid: string (required)
+    //   - text: string (required, size < 1000)
+    //   - at: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "ssungoh905@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasPaid() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.paid == true ||
+        isAdmin()
+      );
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isRecent(t) {
+      return t is timestamp && t > request.time - duration.value(5, 'm') && t < request.time + duration.value(5, 'm');
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.name is string && request.resource.data.name.size() < 50 &&
+        (request.resource.data.role == 'student' || (request.resource.data.role == 'admin' && request.auth.token.email == "ssungoh905@gmail.com"));
+      allow update: if isAdmin() || (isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.paid == resource.data.paid &&
+        request.resource.data.accessUntil == resource.data.accessUntil);
+    }
+
+    match /notes/{chapterId} {
+      allow read: if hasPaid();
+      allow write: if isAdmin() && isRecent(request.resource.data.updatedAt);
+    }
+
+    match /formulas/{formulaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /videos/{chapterId} {
+      allow read: if hasPaid();
+      allow write: if isAdmin();
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.fromUid == request.auth.uid &&
+        request.resource.data.text is string && request.resource.data.text.size() < 500 &&
+        isRecent(request.resource.data.at);
+      allow delete: if isAdmin();
+    }
+
+    match /support_messages/{messageId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.chatId == request.auth.uid);
+      allow create: if isAuthenticated() && (
+        (request.resource.data.chatId == request.auth.uid && request.resource.data.fromUid == request.auth.uid) ||
+        isAdmin()
+      ) && request.resource.data.text is string && request.resource.data.text.size() < 1000 &&
+      isRecent(request.resource.data.at);
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.email);
+      allow create: if isAuthenticated() &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.txnId is string && request.resource.data.txnId.size() < 50 &&
+        isRecent(request.resource.data.submittedAt);
+      allow update: if isAdmin();
+    }
+
+    match /config/global {
+      allow read: if true; // Publicly readable for landing page
+      allow write: if isAdmin();
+    }
+
+    match /chapters/{subjectId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /stats/downloads {
+      allow read: if isAdmin();
+      allow write: if isAuthenticated();
+    }
+  }
+}
